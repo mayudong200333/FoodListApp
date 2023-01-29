@@ -4,7 +4,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const Product = require('./models/product');
 const methodOverride = require('method-override');
-
+const AppError = require('./AppError');
 
 main().catch(err => console.log(err));
 
@@ -44,15 +44,21 @@ app.get('/products', async (req,res)=>{
   }
 })
 
-app.get('/products/:id',async (req,res)=>{
+app.get('/products/:id',async (req,res,next)=>{
   const {id} = req.params;
   const product = await Product.findById(id)
+  if (!product){
+    return next(new AppError('Product Not Found',404));
+  }
   res.render('products/show',{product})
 })
 
-app.get('/products/:id/edit',async (req,res)=>{
+app.get('/products/:id/edit',async (req,res,next)=>{
   const {id} = req.params;
   const product = await Product.findById(id);
+  if (!product){
+    return next(new AppError('Product Not Found',404));
+  }
   res.render('products/edit',{product,categories})
 })
 
@@ -67,6 +73,11 @@ app.delete('/products/:id',async (req,res)=>{
   const product = await Product.findByIdAndDelete(id);
   res.redirect('/products');
 } )
+
+app.use((err,req,res,next)=>{
+  const {status = 500, message='Something went wrong'} = err;
+  res.status(status).send(message);
+})
 
 app.listen(3000,()=>{
     console.log("APP IS LISTENING ON PORT 3000")
