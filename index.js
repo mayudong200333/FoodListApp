@@ -3,6 +3,7 @@ const app = express();
 const path = require('path');
 const mongoose = require('mongoose');
 const Product = require('./models/product');
+const Farm = require('./models/farm')
 const methodOverride = require('method-override');
 const AppError = require('./AppError');
 
@@ -21,6 +22,53 @@ app.set('view engine','ejs')
 app.use(express.urlencoded({extended:true}))
 app.use(methodOverride('_method'))
 
+//FARM ROUTES 
+app.get('/farms',async(req,res)=>{
+  const farms = await Farm.find({})
+  res.render('farms/index',{farms})
+})
+
+app.delete('/farms/:id',async(req,res)=>{
+  const farm = await Farm.findByIdAndDelete(req.params.id);
+  
+  res.redirect('/farms');
+})
+
+app.get('/farms/new',(req,res)=>{
+  res.render('farms/new');
+})
+
+app.get('/farms/:id',async (req,res)=>{
+  const farm = await Farm.findById(req.params.id).populate('products');
+  res.render('farms/show',{farm})
+})
+
+app.post('/farms',async (req,res)=>{
+  const farm = new Farm(req.body);
+  await farm.save();
+  res.redirect('/farms')
+})
+
+app.get('/farms/:id/products/new', async (req, res) => {
+  const { id } = req.params;
+  const farm = await Farm.findById(id);
+  res.render('products/new', { categories, farm })
+})
+
+app.post('/farms/:id/products', async (req, res) => {
+  const { id } = req.params;
+  const farm = await Farm.findById(id);
+  const { name, price, category } = req.body;
+  const product = new Product({ name, price, category });
+  farm.products.push(product);
+  product.farm = farm;
+  await farm.save();
+  await product.save();
+  res.redirect(`/farms/${id}`)
+})
+
+
+//PRODUCTS ROUTES
 const categories = ['fruit','vegetable','dairy']
 
 app.get('/products/new',(req,res)=>{
@@ -53,9 +101,9 @@ function wrapAsync(fn){
 app.get('/products/:id',wrapAsync(async (req,res,next)=>{
 
   const {id} = req.params;
-  const product = await Product.findById(id)
+  const product = await Product.findById(id).populate('farm','name');
   if (!product){
-    new AppError('Product Not Found',404);
+    throw new AppError('Product Not Found',404);
   }
   res.render('products/show',{product})
 }))
@@ -64,7 +112,7 @@ app.get('/products/:id/edit',wrapAsync(async (req,res,next)=>{
   const {id} = req.params;
   const product = await Product.findById(id);
   if (!product){
-    return next(new AppError('Product Not Found',404));
+    throw next(new AppError('Product Not Found',404));
   }
   res.render('products/edit',{product,categories})
 }))
